@@ -1,0 +1,12 @@
+# API Anahtarları ve Özel Bilgiler
+.env
+
+# Python Gereksizleri
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Streamlit Gereksizleri
+.streamlit/
