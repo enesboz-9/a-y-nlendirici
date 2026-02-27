@@ -1,69 +1,73 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. YAPILANDIRMA (OTOMATİK MODEL SEÇİMİ) ---
+# --- 1. YAPILANDIRMA VE OTOMATİK MODEL SEÇİCİ ---
+st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯")
+
+@st.cache_resource
+def get_working_model(api_key):
+    genai.configure(api_key=api_key)
+    # Denenecek model isimleri (En güncelden en kararlıya)
+    models_to_try = [
+        'gemini-1.5-flash', 
+        'gemini-1.5-pro', 
+        'gemini-1.0-pro', 
+        'gemini-pro'
+    ]
+    
+    for m_name in models_to_try:
+        try:
+            test_model = genai.GenerativeModel(m_name)
+            # Modeli test etmek için boş bir çağrı yapıyoruz
+            test_model.generate_content("test")
+            return test_model, m_name
+        except Exception:
+            continue
+    return None, None
+
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=api_key)
+    model, active_model_name = get_working_model(api_key)
     
-    # Hata almamak için sistemdeki modelleri tarayan bir fallback mantığı
-    # Önce en yaygın ismi deniyoruz
-    model = genai.GenerativeModel('gemini-pro')
-except Exception:
-    try:
-        # Eğer yukarıdaki olmazsa (404 verirse), alternatif ismi deniyoruz
-        model = genai.GenerativeModel('models/gemini-pro')
-    except Exception as e:
-        st.error(f"Model Bağlantı Hatası: {e}")
+    if not model:
+        st.error("Üzgünüm, API anahtarınız şu anki Gemini modellerinin hiçbiriyle eşleşmedi. Lütfen Google AI Studio'dan anahtarınızı kontrol edin.")
         st.stop()
+except Exception as e:
+    st.error(f"Sistem Hatası: {e}")
+    st.stop()
 
 # --- 2. VERİTABANI ---
 AI_DIRECTORY = {
-    "Yazılım ve Kodlama": {"name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "desc": "Kodlama işleri."},
-    "Görsel Tasarım": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Görsel ve logo."},
-    "Araştırma": {"name": "Perplexity AI", "url": "https://www.perplexity.ai", "desc": "Bilgi arama."},
-    "Video": {"name": "Luma Dream Machine", "url": "https://lumalabs.ai", "desc": "Video üretimi."},
-    "Metin": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Yazı işleri."}
+    "Yazılım ve Kodlama": {"name": "Claude 3.5", "url": "https://claude.ai", "desc": "Kodlama projeleri için."},
+    "Görsel Tasarım": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Logo ve görsel için."},
+    "Araştırma": {"name": "Perplexity", "url": "https://www.perplexity.ai", "desc": "Hızlı bilgi için."},
+    "Metin": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Yazı ve asistanlık."}
 }
 
 # --- 3. ARAYÜZ ---
-st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯")
 st.title("🎯 Akıllı AI Yönlendirici")
-st.caption("Enes Boz tarafından tasarlanmıştır.")
+st.caption(f"Tasarım: Enes Boz | Çalışan Model: {active_model_name}")
 st.divider()
 
-query = st.text_input("Bugün ne yapmak istiyorsun?", placeholder="Örn: Bir web sitesi hazırlamak istiyorum.")
+query = st.text_input("Bugün ne yapmak istiyorsun?", placeholder="Örn: Logo tasarlatmak istiyorum.")
 
 if st.button("En Uygun AI'ı Göster", type="primary"):
     if query:
         with st.spinner('Bağlantı kuruluyor...'):
             try:
-                # SADECE kullanıcı girişini gönderiyoruz, karmaşık promptları bırakıyoruz
-                # Bu, 404 hatasını tetikleyen v1beta zorlamasını aşabilir.
-                response = model.generate_content(query)
+                prompt = f"Kullanıcı sorusu: {query}. Bunu şu listeden bir kategoriyle eşleştir: {list(AI_DIRECTORY.keys())}. Sadece kategori adını yaz."
+                response = model.generate_content(prompt)
                 
-                if response:
-                    res_text = response.text.lower()
-                    
-                    # AI'ın cevabında kategorilerimizi arıyoruz
-                    matched_cat = None
-                    for cat in AI_DIRECTORY.keys():
-                        if cat.lower() in res_text:
-                            matched_cat = cat
-                            break
-                    
-                    # Eğer AI düzgün cevap vermezse varsayılan olarak "Metin" atayalım
-                    if not matched_cat:
-                        matched_cat = "Metin"
-                    
-                    res = AI_DIRECTORY[matched_cat]
-                    st.balloons()
-                    st.success(f"Önerilen Araç: **{res['name']}**")
-                    with st.container(border=True):
-                        st.write(res['desc'])
-                        st.link_button(f"{res['name']} Sayfasına Git", res['url'], use_container_width=True)
+                res_text = response.text.strip()
+                matched_cat = next((cat for cat in AI_DIRECTORY.keys() if cat.lower() in res_text.lower()), "Metin")
+                
+                res = AI_DIRECTORY[matched_cat]
+                st.balloons()
+                st.success(f"Önerilen: **{res['name']}**")
+                st.info(res['desc'])
+                st.link_button(f"{res['name']} Sayfasına Git", res['url'], use_container_width=True)
             except Exception as e:
-                st.error(f"Teknik bir sorun oluştu: {e}")
+                st.error(f"Analiz hatası: {e}")
     else:
         st.warning("Lütfen bir giriş yapın.")
 
