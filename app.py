@@ -2,7 +2,7 @@ import streamlit as st
 from groq import Groq
 
 # Sayfa Yapılandırması
-st.set_page_config(page_title="AI Küratörü | Enes Bozo", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="AI Küratörü | Enes Boz", page_icon="🤖", layout="wide")
 
 # 1. Veri Tabanı: 2026 AI Ekosistemi (Güncel Linklerle)
 AI_REHBERI = {
@@ -63,7 +63,7 @@ else:
 
 # 3. Arayüz Tasarımı
 st.title("🚀 AI Küratörü: Akıllı Çözüm Rehberi")
-st.markdown(f"**Geliştirici:** `Enes Bozo` | 2026 AI Ekosistemi")
+st.markdown(f"**Geliştirici:** `Enes Boz` | 2026 AI Ekosistemi")
 st.markdown("---")
 
 user_query = st.text_input("Ne üretmek istiyorsun?", placeholder="Örn: Yeni markam için bir logo ve kısa bir tanıtım videosu lazım...")
@@ -124,3 +124,4 @@ if user_query:
 st.sidebar.markdown("---")
 st.sidebar.write(f"© 2026 **Enes Boz**")
 st.sidebar.caption("Bu uygulama Groq Llama 3.3 altyapısını kullanarak saniyeler içinde karar verir.")
+
