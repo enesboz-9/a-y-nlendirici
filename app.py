@@ -1,69 +1,81 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. AYARLAR VE OTOMATİK MODEL BULUCU ---
-st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯")
+# --- 1. AYARLAR VE MODEL BAĞLANTISI ---
+st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯", layout="centered")
 
-try:
-    api_key = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=api_key)
-    
-    # Kanka burada sistemdeki tüm modelleri tarayıp 
-    # hangisi çalışıyorsa onu kapıyoruz (404'ü bitiren çözüm)
-    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    
-    # Öncelik sıramız: 1.5 Flash, 1.5 Pro, 1.0 Pro
-    target_model = None
-    for preferred in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-1.0-pro', 'models/gemini-pro']:
-        if preferred in available_models:
-            target_model = preferred
-            break
-            
-    if not target_model:
-        st.error("Hesabınızda kullanılabilir bir Gemini modeli bulunamadı.")
-        st.stop()
+@st.cache_resource
+def initialize_ai():
+    try:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        genai.configure(api_key=api_key)
         
-    model = genai.GenerativeModel(target_model)
-    active_name = target_model.split('/')[-1]
+        # Denenecek model listesi (En güncelden en kararlıya)
+        models_to_try = [
+            'gemini-3-flash-preview', # Senin istediğin güncel model
+            'gemini-1.5-flash', 
+            'gemini-1.0-pro'
+        ]
+        
+        for m_name in models_to_try:
+            try:
+                test_model = genai.GenerativeModel(m_name)
+                # Modeli doğrulamak için boş bir çağrı yapıyoruz
+                test_model.generate_content("ping")
+                return test_model, m_name
+            except:
+                continue
+        return None, None
+    except Exception as e:
+        return None, str(e)
 
-except Exception as e:
-    st.error(f"Sistem Hatası: {e}")
-    st.stop()
+model, active_model_name = initialize_ai()
 
-# --- 2. VERİTABANI ---
+# --- 2. AI VERİTABANI ---
 AI_DIRECTORY = {
-    "Yazılım": {"name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "desc": "Kodlama ve teknik işler."},
-    "Tasarım": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Görsel ve logo tasarımı."},
-    "Araştırma": {"name": "Perplexity", "url": "https://www.perplexity.ai", "desc": "Hızlı bilgi arama."},
-    "Genel": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Yazı ve asistanlık."}
+    "Yazılım ve Kodlama": {"name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "desc": "Karmaşık kodlama ve teknik analizler için en iyisi."},
+    "Görsel ve Tasarım": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Logo, sanatsal görsel ve profesyonel tasarım için."},
+    "Hızlı Bilgi ve Araştırma": {"name": "Perplexity AI", "url": "https://www.perplexity.ai", "desc": "İnternet taramalı, kaynak gösteren güncel bilgi arama."},
+    "Metin ve Yazışma": {"name": "ChatGPT (GPT-4o)", "url": "https://chatgpt.com", "desc": "E-posta, makale yazımı ve genel asistanlık için."},
+    "Video Üretimi": {"name": "Luma Dream Machine", "url": "https://lumalabs.ai", "desc": "Yüksek kaliteli yapay zeka videoları için."}
 }
 
-# --- 3. ARAYÜZ ---
+# --- 3. ARAYÜZ (UI) ---
 st.title("🎯 Akıllı AI Yönlendirici")
-st.caption(f"Tasarım: Enes Boz | Çalışan Model: {active_name}")
+st.markdown(f"**Geliştirici:** Enes Boz | **Aktif Beyin:** `{active_model_name}`")
 st.divider()
 
-user_input = st.text_input("Bugün ne yapmak istiyorsun?", placeholder="Örn: Logo tasarlatmak istiyorum.")
+if model is None:
+    st.error(f"⚠️ Bağlantı Hatası: {active_model_name}")
+    st.info("Lütfen Streamlit Secrets kısmına geçerli bir API anahtarı eklediğinizden emin olun.")
+    st.stop()
 
-if st.button("Hangi AI Uygun?", type="primary"):
-    if user_input:
-        with st.spinner('Zekamız analiz ediyor...'):
+query = st.text_input("Bugün ne oluşturmak istiyorsun?", placeholder="Örn: Python ile yılan oyunu yazmak istiyorum.")
+
+if st.button("En Uygun AI'ı Bul", type="primary"):
+    if query:
+        with st.spinner('Işık hızında analiz ediliyor...'):
             try:
-                prompt = f"Kullanıcı isteği: {user_input}. Bu isteği şu kategorilerden biriyle eşleştir: Yazılım, Tasarım, Araştırma, Genel. Sadece kategori adını yaz."
+                prompt = f"Kullanıcı sorusu: {query}. Bu soruyu şu kategorilerden biriyle eşleştir: {list(AI_DIRECTORY.keys())}. Sadece kategori adını yaz, başka açıklama yapma."
                 response = model.generate_content(prompt)
                 
-                decision = response.text.strip()
-                matched = next((k for k in AI_DIRECTORY if k.lower() in decision.lower()), "Genel")
+                # Cevabı temizle ve eşleştir
+                res_text = response.text.strip()
+                matched_cat = next((cat for cat in AI_DIRECTORY.keys() if cat.lower() in res_text.lower()), "Metin ve Yazışma")
                 
-                res = AI_DIRECTORY[matched]
+                res = AI_DIRECTORY[matched_cat]
+                
+                # Sonuç Ekranı
                 st.balloons()
-                st.success(f"Tavsiyemiz: **{res['name']}**")
+                st.success(f"Senin için en uygun araç: **{res['name']}**")
+                
                 with st.container(border=True):
-                    st.write(res['desc'])
-                    st.link_button(f"{res['name']} Uygulamasına Git", res['url'], use_container_width=True)
+                    st.write(f"**Neden bu araç?** {res['desc']}")
+                    st.link_button(f"{res['name']} Sitesine Git", res['url'], use_container_width=True)
+                    
             except Exception as e:
-                st.error(f"Analiz sırasında bir hata oluştu: {e}")
+                st.error(f"Analiz hatası: {e}")
     else:
-        st.warning("Lütfen bir giriş yapın.")
+        st.warning("Lütfen bir şeyler yazın.")
 
-st.markdown("<br><center style='opacity: 0.5;'>© 2026 | Enes Boz</center>", unsafe_allow_html=True)
+st.markdown("<br><hr><center style='opacity: 0.5;'>© 2026 | Enes Boz AI Lab</center>", unsafe_allow_html=True)
