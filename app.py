@@ -1,47 +1,15 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. AYARLAR VE MODEL BAĞLANTISI (ARKA PLANDA) ---
-st.set_page_config(
-    page_title="AI Router | Enes Boz", 
-    page_icon="🎯", 
-    layout="centered"
-)
+# --- 1. AYARLAR VE MODEL ---
+st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯", layout="centered")
 
-# Custom CSS ile Arayüzü Güzelleştirelim
+# CSS - Kart ve Alternatif Tasarımı
 st.markdown("""
     <style>
-    .main {
-        background-color: #f8f9fa;
-    }
-    /* Buton Tasarımı */
-    .stButton>button {
-        width: 100%;
-        border-radius: 20px;
-        height: 3em;
-        background-color: #FF4B4B; /* Ana Kırmızı Renk */
-        color: white;
-        font-weight: bold;
-        border: none;
-        transition: background-color 0.3s ease;
-    }
-    .stButton>button:hover {
-        background-color: #e04343; /* Hover Rengi */
-    }
-    /* Giriş Kutusu Tasarımı */
-    .stTextInput>div>div>input {
-        border-radius: 15px;
-        border: 1px solid #ced4da;
-    }
-    /* Sonuç Kartı Tasarımı */
-    .ai-card {
-        padding: 25px;
-        border-radius: 15px;
-        background-color: white;
-        box-shadow: 0 10px 15px rgba(0,0,0,0.05);
-        margin-bottom: 25px;
-        border: 1px solid #eaeaea;
-    }
+    .stButton>button { width: 100%; border-radius: 20px; background-color: #FF4B4B; color: white; font-weight: bold; }
+    .ai-card { padding: 25px; border-radius: 15px; background-color: white; box-shadow: 0 10px 15px rgba(0,0,0,0.05); border: 1px solid #eaeaea; }
+    .alt-card { padding: 10px; border-radius: 10px; background-color: #f1f3f5; margin-top: 10px; border-left: 5px solid #FF4B4B; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -50,7 +18,6 @@ def initialize_ai():
     try:
         api_key = st.secrets["GOOGLE_API_KEY"]
         genai.configure(api_key=api_key)
-        # Arka planda en iyi modeli bulalım
         for m_name in ['gemini-3-flash-preview', 'gemini-1.5-flash', 'gemini-1.0-pro']:
             try:
                 test_model = genai.GenerativeModel(m_name)
@@ -62,66 +29,83 @@ def initialize_ai():
 
 model = initialize_ai()
 
-# --- 2. AI VERİTABANI ---
+# --- 2. GÜNCELLENMİŞ VERİTABANI (ALTERNATİFLER EKLENDİ) ---
 AI_DIRECTORY = {
-    "Yazılım ve Kodlama": {"name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "desc": "Kod yazımı, hata ayıklama ve teknik dökümantasyon için lider.", "icon": "💻"},
-    "Görsel ve Tasarım": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Dünyanın en gelişmiş yapay zeka görsel üretim aracı.", "icon": "🎨"},
-    "Hızlı Bilgi ve Araştırma": {"name": "Perplexity AI", "url": "https://www.perplexity.ai", "desc": "Canlı internet verisiyle akademik seviyede araştırma asistanı.", "icon": "🔍"},
-    "Metin ve Yazışma": {"name": "ChatGPT (GPT-4o)", "url": "https://chatgpt.com", "desc": "Yaratıcı yazarlık, çeviri ve genel asistanlık için ideal.", "icon": "✍️"},
-    "Video Üretimi": {"name": "Luma Dream Machine", "url": "https://lumalabs.ai", "desc": "Gerçekçi ve yüksek çözünürlüklü yapay zeka videoları.", "icon": "🎬"}
+    "Yazılım ve Kodlama": {
+        "name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "icon": "💻",
+        "desc": "Kod yazımı ve teknik dökümantasyon için lider.",
+        "alternatives": ["Cursor AI", "GitHub Copilot"]
+    },
+    "Görsel ve Tasarım": {
+        "name": "Midjourney", "url": "https://www.midjourney.com", "icon": "🎨",
+        "desc": "Profesyonel sanatsal görsel üretim aracı.",
+        "alternatives": ["DALL-E 3", "Leonardo AI"]
+    },
+    "Hızlı Bilgi ve Araştırma": {
+        "name": "Perplexity AI", "url": "https://www.perplexity.ai", "icon": "🔍",
+        "desc": "Canlı internet verisiyle akademik araştırma asistanı.",
+        "alternatives": ["Grok-2", "SearchGPT"]
+    },
+    "Metin ve Yazışma": {
+        "name": "ChatGPT (GPT-4o)", "url": "https://chatgpt.com", "icon": "✍️",
+        "desc": "Yaratıcı yazarlık ve genel asistanlık için ideal.",
+        "alternatives": ["Google Gemini", "Mistral Large"]
+    },
+    "Video Üretimi": {
+        "name": "Luma Dream Machine", "url": "https://lumalabs.ai", "icon": "🎬",
+        "desc": "Yüksek çözünürlüklü yapay zeka videoları.",
+        "alternatives": ["Runway Gen-3", "Sora (Erişim Bekleniyor)"]
+    }
 }
 
-# --- 3. ARAYÜZ (UI) ---
+# --- 3. ARAYÜZ ---
 st.title("🎯 Akıllı AI Yönlendirici")
-st.markdown("İhtiyacın olan görevi yaz, senin için **en iyi yapay zekayı** bulalım.")
-st.divider()
+st.markdown("İhtiyacın olan görevi yaz, en iyisini ve alternatiflerini bulalım.")
 
-if model is None:
-    st.error("Sistem şu an meşgul. Lütfen API anahtarınızı kontrol edin.")
-    st.stop()
-
-# Yan sütun (Sidebar)
 with st.sidebar:
-    st.title("Uygulama Bilgisi")
-    st.info("Bu araç, ihtiyacınıza en uygun AI modelini seçmek için Gemini zekasını kullanır.")
-    st.markdown("---")
+    st.title("Bilgi")
     st.caption("Geliştirici: Enes Boz")
-    st.caption("Versiyon: 2.1.0")
+    st.caption("Versiyon: 2.2.0")
 
-# Giriş Alanı
-query = st.text_input("Bugün ne oluşturmak istiyorsun?", placeholder="Örn: Modern bir logo tasarlatmak istiyorum.")
+query = st.text_input("Bugün ne oluşturmak istiyorsun?", placeholder="Örn: Python ile veri analizi yapmak istiyorum.")
 
-# İşlem ve Sonuç
 if st.button("En Uygun AI'ı Bul"):
     if query:
-        with st.spinner('Yapay zeka modelleri taranıyor...'):
+        with st.spinner('Analiz ediliyor...'):
             try:
-                prompt = f"Kullanıcı sorusu: {query}. Kategoriler: {list(AI_DIRECTORY.keys())}. Sadece kategori adını yaz."
+                prompt = f"Soru: {query}. Kategoriler: {list(AI_DIRECTORY.keys())}. Sadece bir kategori adını yaz."
                 response = model.generate_content(prompt)
-                
                 res_text = response.text.strip()
                 matched_cat = next((cat for cat in AI_DIRECTORY.keys() if cat.lower() in res_text.lower()), "Metin ve Yazışma")
                 
                 res = AI_DIRECTORY[matched_cat]
-                
                 st.balloons()
                 
-                # --- Şık ve Okunaklı Sonuç Kartı ---
-                # 'Önerilen: Program İsmi' kısmı artık Kırmızı renkte ve net!
+                # ANA SONUÇ KARTI
                 st.markdown(f"""
                 <div class="ai-card">
                     <h2 style='margin-top: 0;'>{res['icon']} <span style='color: #FF4B4B;'>Önerilen: {res['name']}</span></h2>
-                    <p style="color: #444; font-size: 1.1em; line-height: 1.6;">{res['desc']}</p>
+                    <p style="color: #444; font-size: 1.1em;">{res['desc']}</p>
                 </div>
                 """, unsafe_allow_html=True)
+                st.link_button(f"{res['name']} Sitesine Git", res['url'], use_container_width=True)
                 
-                # Git Butonu (Kırmızı)
-                st.link_button(f"{res['name']} Web Sitesini Aç", res['url'], use_container_width=True)
-                    
+                # ALTERNATİFLER BÖLÜMÜ
+                st.markdown("---")
+                st.subheader("🔁 Diğer Alternatifler")
+                cols = st.columns(len(res['alternatives']))
+                
+                for i, alt in enumerate(res['alternatives']):
+                    with cols[i]:
+                        st.markdown(f"""
+                        <div class="alt-card">
+                            <b>{alt}</b>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
             except Exception as e:
-                st.error("Küçük bir hata oluştu, lütfen tekrar deneyin.")
+                st.error("Bir hata oluştu, lütfen tekrar deneyin.")
     else:
         st.warning("Lütfen bir görev tanımlayın.")
 
-# Footer
-st.markdown("<br><br><br><center style='opacity: 0.3;'>© 2026 | Enes Boz AI Lab</center>", unsafe_allow_html=True)
+st.markdown("<br><center style='opacity: 0.3;'>© 2026 | Enes Boz AI Lab</center>", unsafe_allow_html=True)
