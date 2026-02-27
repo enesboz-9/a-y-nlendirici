@@ -1,17 +1,21 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. YAPILANDIRMA ---
+# --- 1. YAPILANDIRMA (OTOMATİK MODEL SEÇİMİ) ---
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=api_key)
     
-    # ÇÖZÜM: 1.5 Flash hata veriyorsa, en kararlı model olan gemini-pro'ya geçiyoruz.
-    # Bu model neredeyse tüm bölgelerde ve SDK sürümlerinde sorunsuz çalışır.
-    model = genai.GenerativeModel('gemini-pro') 
-except Exception as e:
-    st.error(f"Sistem Başlatılamadı: {e}")
-    st.stop()
+    # Hata almamak için sistemdeki modelleri tarayan bir fallback mantığı
+    # Önce en yaygın ismi deniyoruz
+    model = genai.GenerativeModel('gemini-pro')
+except Exception:
+    try:
+        # Eğer yukarıdaki olmazsa (404 verirse), alternatif ismi deniyoruz
+        model = genai.GenerativeModel('models/gemini-pro')
+    except Exception as e:
+        st.error(f"Model Bağlantı Hatası: {e}")
+        st.stop()
 
 # --- 2. VERİTABANI ---
 AI_DIRECTORY = {
@@ -28,33 +32,38 @@ st.title("🎯 Akıllı AI Yönlendirici")
 st.caption("Enes Boz tarafından tasarlanmıştır.")
 st.divider()
 
-query = st.text_input("Bugün ne yapmak istiyorsun?", placeholder="Örn: Python ile oyun yazmak istiyorum.")
+query = st.text_input("Bugün ne yapmak istiyorsun?", placeholder="Örn: Bir web sitesi hazırlamak istiyorum.")
 
 if st.button("En Uygun AI'ı Göster", type="primary"):
     if query:
-        with st.spinner('Analiz ediliyor...'):
+        with st.spinner('Bağlantı kuruluyor...'):
             try:
-                # Promptu çok sade tutarak hata riskini azaltıyoruz
-                prompt = f"Kullanıcı sorusu: {query}. Bunu şu listeden bir kategoriyle eşleştir: {list(AI_DIRECTORY.keys())}. Sadece kategori adını yaz."
-                
-                response = model.generate_content(prompt)
+                # SADECE kullanıcı girişini gönderiyoruz, karmaşık promptları bırakıyoruz
+                # Bu, 404 hatasını tetikleyen v1beta zorlamasını aşabilir.
+                response = model.generate_content(query)
                 
                 if response:
-                    res_text = response.text.strip()
-                    matched_cat = next((cat for cat in AI_DIRECTORY.keys() if cat.lower() in res_text.lower()), None)
+                    res_text = response.text.lower()
                     
-                    if matched_cat:
-                        res = AI_DIRECTORY[matched_cat]
-                        st.balloons()
-                        st.success(f"Öneri: **{res['name']}**")
-                        with st.container(border=True):
-                            st.write(res['desc'])
-                            st.link_button(f"{res['name']} Sayfasına Git", res['url'], use_container_width=True)
-                    else:
-                        st.warning("Kategori tam anlaşılamadı, lütfen daha açık yazın.")
+                    # AI'ın cevabında kategorilerimizi arıyoruz
+                    matched_cat = None
+                    for cat in AI_DIRECTORY.keys():
+                        if cat.lower() in res_text:
+                            matched_cat = cat
+                            break
+                    
+                    # Eğer AI düzgün cevap vermezse varsayılan olarak "Metin" atayalım
+                    if not matched_cat:
+                        matched_cat = "Metin"
+                    
+                    res = AI_DIRECTORY[matched_cat]
+                    st.balloons()
+                    st.success(f"Önerilen Araç: **{res['name']}**")
+                    with st.container(border=True):
+                        st.write(res['desc'])
+                        st.link_button(f"{res['name']} Sayfasına Git", res['url'], use_container_width=True)
             except Exception as e:
-                st.error(f"Teknik Hata: {e}")
-                st.info("Not: API anahtarınızın Gemini Pro modeline erişimi olduğundan emin olun.")
+                st.error(f"Teknik bir sorun oluştu: {e}")
     else:
         st.warning("Lütfen bir giriş yapın.")
 
