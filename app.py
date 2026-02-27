@@ -1,73 +1,63 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. YAPILANDIRMA VE OTOMATİK MODEL SEÇİCİ ---
+# --- 1. YAPILANDIRMA ---
 st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯")
 
-@st.cache_resource
-def get_working_model(api_key):
-    genai.configure(api_key=api_key)
-    # Denenecek model isimleri (En güncelden en kararlıya)
-    models_to_try = [
-        'gemini-1.5-flash', 
-        'gemini-1.5-pro', 
-        'gemini-1.0-pro', 
-        'gemini-pro'
-    ]
-    
-    for m_name in models_to_try:
-        try:
-            test_model = genai.GenerativeModel(m_name)
-            # Modeli test etmek için boş bir çağrı yapıyoruz
-            test_model.generate_content("test")
-            return test_model, m_name
-        except Exception:
-            continue
-    return None, None
-
+# API Anahtarı ve Model Ayarı
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
-    model, active_model_name = get_working_model(api_key)
+    genai.configure(api_key=api_key)
     
-    if not model:
-        st.error("Üzgünüm, API anahtarınız şu anki Gemini modellerinin hiçbiriyle eşleşmedi. Lütfen Google AI Studio'dan anahtarınızı kontrol edin.")
-        st.stop()
+    # En temel ve kısıtlamalara en az takılan model ismi
+    model = genai.GenerativeModel('gemini-pro')
+    
 except Exception as e:
-    st.error(f"Sistem Hatası: {e}")
+    st.error("Lütfen Streamlit Secrets kısmına geçerli bir API anahtarı girin.")
     st.stop()
 
 # --- 2. VERİTABANI ---
 AI_DIRECTORY = {
-    "Yazılım ve Kodlama": {"name": "Claude 3.5", "url": "https://claude.ai", "desc": "Kodlama projeleri için."},
-    "Görsel Tasarım": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Logo ve görsel için."},
-    "Araştırma": {"name": "Perplexity", "url": "https://www.perplexity.ai", "desc": "Hızlı bilgi için."},
-    "Metin": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Yazı ve asistanlık."}
+    "Yazılım": {"name": "Claude 3.5", "url": "https://claude.ai", "desc": "Kodlama projeleri."},
+    "Tasarım": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Görsel üretim."},
+    "Araştırma": {"name": "Perplexity", "url": "https://www.perplexity.ai", "desc": "Hızlı bilgi."},
+    "Genel": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Yazı ve asistanlık."}
 }
 
 # --- 3. ARAYÜZ ---
 st.title("🎯 Akıllı AI Yönlendirici")
-st.caption(f"Tasarım: Enes Boz | Çalışan Model: {active_model_name}")
+st.caption("Enes Boz tarafından tasarlanmıştır.")
 st.divider()
 
-query = st.text_input("Bugün ne yapmak istiyorsun?", placeholder="Örn: Logo tasarlatmak istiyorum.")
+user_input = st.text_input("Ne yapmak istiyorsunuz?", placeholder="Örn: Python öğrenmek istiyorum.")
 
-if st.button("En Uygun AI'ı Göster", type="primary"):
-    if query:
-        with st.spinner('Bağlantı kuruluyor...'):
+if st.button("Hangi AI Uygun?", type="primary"):
+    if user_input:
+        with st.spinner('AI Yanıtlıyor...'):
             try:
-                prompt = f"Kullanıcı sorusu: {query}. Bunu şu listeden bir kategoriyle eşleştir: {list(AI_DIRECTORY.keys())}. Sadece kategori adını yaz."
+                # Çok kısa ve net bir sorgu gönderiyoruz
+                prompt = f"Soru: {user_input}. Sadece bir kelimeyle şu kategorilerden hangisi uygun: Yazılım, Tasarım, Araştırma, Genel?"
                 response = model.generate_content(prompt)
                 
-                res_text = response.text.strip()
-                matched_cat = next((cat for cat in AI_DIRECTORY.keys() if cat.lower() in res_text.lower()), "Metin")
+                # Yanıtı temizle
+                decision = response.text.strip()
                 
-                res = AI_DIRECTORY[matched_cat]
+                # Eşleştirme
+                matched = "Genel" # Varsayılan
+                for key in AI_DIRECTORY.keys():
+                    if key.lower() in decision.lower():
+                        matched = key
+                        break
+                
+                res = AI_DIRECTORY[matched]
                 st.balloons()
-                st.success(f"Önerilen: **{res['name']}**")
+                st.success(f"Tavsiyemiz: **{res['name']}**")
                 st.info(res['desc'])
-                st.link_button(f"{res['name']} Sayfasına Git", res['url'], use_container_width=True)
+                st.link_button(f"{res['name']} Uygulamasına Git", res['url'], use_container_width=True)
+                
             except Exception as e:
-                st.error(f"Analiz hatası: {e}")
+                st.error(f"API Hatası: {e}")
+                st.info("İpucu: API Studio'daki uyarıyı düzeltene kadar bu hata devam edebilir.")
     else:
         st.warning("Lütfen bir giriş yapın.")
 
