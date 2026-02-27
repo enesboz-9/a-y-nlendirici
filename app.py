@@ -1,31 +1,23 @@
 import streamlit as st
 import google.generativeai as genai
-import os
-from dotenv import load_dotenv
 
-# .env yükle
-load_dotenv()
-api_key = os.getenv("GOOGLE_API_KEY")
+# Streamlit Secrets üzerinden anahtarı çek (En güvenli ve doğru yol budur)
+api_key = st.secrets["GOOGLE_API_KEY"]
 
-# Arayüz Ayarları
+# Arayüz Ayarları ve İmza
 st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯")
-
-# Tasarımcı İmzası
 st.title("🎯 Akıllı AI Yönlendirici")
 st.caption("Enes Boz tarafından tasarlanmıştır.")
 st.markdown("---")
 
-# API Yapılandırma ve Kontrol
-if not api_key:
-    st.error("HATA: .env dosyasında GOOGLE_API_KEY bulunamadı!")
-    st.stop()
-
+# API Yapılandırma
 try:
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
-    st.error(f"Yapılandırma Hatası: {e}")
+    st.error(f"API Yapılandırılamadı: {e}")
 
+# Veritabanı
 AI_DIRECTORY = {
     "Yazılım ve Kodlama": {"name": "Claude 4.5", "url": "https://claude.ai", "desc": "Kod yazımı ve teknik işler."},
     "Görsel Oluşturma": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Logo ve görsel tasarım."},
@@ -34,47 +26,32 @@ AI_DIRECTORY = {
     "Metin ve Yazarlık": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Genel metin işleri."}
 }
 
-query = st.text_input("Ne yapmak istiyorsunuz?", placeholder="Örn: Python ile veri analizi yapacağım.")
+query = st.text_input("Ne yapmak istiyorsunuz?", placeholder="Örn: Bir logo tasarlatmak istiyorum.")
 
 if st.button("En Uygun AI'ı Göster"):
     if query:
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        try:
-            status_text.text("Analiz ediliyor... (Lütfen bekleyin)")
-            progress_bar.progress(30)
-            
-            # Daha basit ve doğrudan bir prompt
-            prompt = f"Kullanıcı ' {query} ' dedi. Bunu sadece şu kategorilerden biriyle eşleştir: {list(AI_DIRECTORY.keys())}. Sadece kategori adını yaz."
-            
-            # API Çağrısı
-            response = model.generate_content(prompt)
-            progress_bar.progress(100)
-            
-            category_result = response.text.strip()
-            
-            # Eşleştirme Kontrolü
-            matched_category = None
-            for cat in AI_DIRECTORY.keys():
-                if cat.lower() in category_result.lower():
-                    matched_category = cat
-                    break
-            
-            if matched_category:
-                res = AI_DIRECTORY[matched_category]
-                st.balloons()
-                st.success(f"Analiz Başarılı! Önerilen: **{res['name']}**")
-                st.write(res['desc'])
-                st.link_button(f"{res['name']} Sayfasına Git 🚀", res['url'], use_container_width=True)
-            else:
-                st.warning(f"API '{category_result}' yanıtını verdi ama listede bulamadım. Lütfen tekrar deneyin.")
+        with st.spinner('Analiz ediliyor...'):
+            try:
+                prompt = f"Kullanıcı isteği: '{query}'. Bunu sadece şu kategorilerden biriyle eşleştir: {list(AI_DIRECTORY.keys())}. Sadece kategori adını yaz."
+                response = model.generate_content(prompt)
+                category_result = response.text.strip()
                 
-        except Exception as e:
-            st.error(f"Bağlantı Hatası oluştu: {str(e)}")
-            st.info("İpucu: İnternet bağlantınızı veya API anahtarınızın aktifliğini kontrol edin.")
-        finally:
-            status_text.empty()
+                matched_category = None
+                for cat in AI_DIRECTORY.keys():
+                    if cat.lower() in category_result.lower():
+                        matched_category = cat
+                        break
+                
+                if matched_category:
+                    res = AI_DIRECTORY[matched_category]
+                    st.balloons()
+                    st.success(f"Önerilen Araç: **{res['name']}**")
+                    st.info(res['desc'])
+                    st.link_button(f"{res['name']} Sayfasına Git 🚀", res['url'], use_container_width=True)
+                else:
+                    st.warning("Eşleşme sağlanamadı, lütfen başka bir cümle deneyin.")
+            except Exception as e:
+                st.error("Bir hata oluştu. Lütfen Secrets kısmındaki API anahtarını kontrol edin.")
     else:
         st.warning("Lütfen bir giriş yapın.")
 
