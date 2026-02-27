@@ -8,17 +8,15 @@ try:
     api_key = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=api_key)
     
-    # En stabil model ismi. Başına 'models/' ekleyerek 404'ü engelliyoruz.
-    # Versiyon zorlamasını kütüphane kendi halletsin diye sade bıraktık.
+    # 404 hatasını aşmak için en yalın model ismini kullanıyoruz
     model = genai.GenerativeModel('gemini-1.5-flash')
-    
 except Exception as e:
     st.error(f"Başlatma Hatası: {e}")
     st.stop()
 
-# --- 2. AI VERİTABANI ---
+# --- 2. VERİTABANI ---
 AI_DIRECTORY = {
-    "Yazılım": {"name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "desc": "Kodlama projeleri için."},
+    "Yazılım": {"name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "desc": "Kodlama ve mantık işleri."},
     "Tasarım": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Görsel ve logo tasarımı."},
     "Araştırma": {"name": "Perplexity", "url": "https://www.perplexity.ai", "desc": "Hızlı bilgi arama."},
     "Genel": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Metin ve asistanlık."}
@@ -29,18 +27,18 @@ st.title("🎯 Akıllı AI Yönlendirici")
 st.caption("Enes Boz tarafından geliştirilmiştir.")
 st.divider()
 
-user_input = st.text_input("Ne yapmak istersiniz?", placeholder="Örn: Python ile bir uygulama yazmak istiyorum.")
+user_input = st.text_input("Ne yapmak istersiniz?", placeholder="Örn: Python öğrenmek istiyorum.")
 
-if st.button("AI Önerisini Gör", type="primary"):
+if st.button("Hangi AI Uygun?", type="primary"):
     if user_input:
-        with st.spinner('Bağlantı kuruluyor...'):
+        with st.spinner('Analiz ediliyor...'):
             try:
-                # En basit prompt yapısı
-                response = model.generate_content(f"Sadece bir kategori seç: Yazılım, Tasarım, Araştırma, Genel. Kullanıcı isteği: {user_input}")
+                # Promptu aşırı basit tutuyoruz
+                prompt = f"Kullanıcı isteği: {user_input}. Bu isteğe en uygun kategoriyi seç: Yazılım, Tasarım, Araştırma, Genel. Sadece kategoriyi yaz."
+                response = model.generate_content(prompt)
                 
                 decision = response.text.strip()
-                matched = "Genel"
-                
+                matched = "Genel" # Varsayılan
                 for key in AI_DIRECTORY.keys():
                     if key.lower() in decision.lower():
                         matched = key
@@ -48,13 +46,12 @@ if st.button("AI Önerisini Gör", type="primary"):
                 
                 res = AI_DIRECTORY[matched]
                 st.balloons()
-                st.success(f"Önerimiz: **{res['name']}**")
+                st.success(f"Tavsiyemiz: **{res['name']}**")
                 with st.container(border=True):
                     st.write(res['desc'])
-                    st.link_button(f"{res['name']} Sayfasına Git", res['url'], use_container_width=True)
-            
+                    st.link_button(f"{res['name']} Uygulamasına Git", res['url'], use_container_width=True)
             except Exception as e:
-                st.error(f"Bir hata oluştu: {e}")
+                st.error(f"Teknik Hata: {e}")
     else:
         st.warning("Lütfen bir giriş yapın.")
 
