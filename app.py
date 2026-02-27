@@ -1,48 +1,59 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. AYARLAR ---
+# --- 1. AYARLAR VE OTOMATİK MODEL BULUCU ---
 st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯")
 
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=api_key)
     
-    # 404 hatasını aşmak için en yalın model ismini kullanıyoruz
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Kanka burada sistemdeki tüm modelleri tarayıp 
+    # hangisi çalışıyorsa onu kapıyoruz (404'ü bitiren çözüm)
+    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    
+    # Öncelik sıramız: 1.5 Flash, 1.5 Pro, 1.0 Pro
+    target_model = None
+    for preferred in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-1.0-pro', 'models/gemini-pro']:
+        if preferred in available_models:
+            target_model = preferred
+            break
+            
+    if not target_model:
+        st.error("Hesabınızda kullanılabilir bir Gemini modeli bulunamadı.")
+        st.stop()
+        
+    model = genai.GenerativeModel(target_model)
+    active_name = target_model.split('/')[-1]
+
 except Exception as e:
-    st.error(f"Başlatma Hatası: {e}")
+    st.error(f"Sistem Hatası: {e}")
     st.stop()
 
 # --- 2. VERİTABANI ---
 AI_DIRECTORY = {
-    "Yazılım": {"name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "desc": "Kodlama ve mantık işleri."},
+    "Yazılım": {"name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "desc": "Kodlama ve teknik işler."},
     "Tasarım": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Görsel ve logo tasarımı."},
     "Araştırma": {"name": "Perplexity", "url": "https://www.perplexity.ai", "desc": "Hızlı bilgi arama."},
-    "Genel": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Metin ve asistanlık."}
+    "Genel": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Yazı ve asistanlık."}
 }
 
 # --- 3. ARAYÜZ ---
 st.title("🎯 Akıllı AI Yönlendirici")
-st.caption("Enes Boz tarafından geliştirilmiştir.")
+st.caption(f"Tasarım: Enes Boz | Çalışan Model: {active_name}")
 st.divider()
 
-user_input = st.text_input("Ne yapmak istersiniz?", placeholder="Örn: Python öğrenmek istiyorum.")
+user_input = st.text_input("Bugün ne yapmak istiyorsun?", placeholder="Örn: Logo tasarlatmak istiyorum.")
 
 if st.button("Hangi AI Uygun?", type="primary"):
     if user_input:
-        with st.spinner('Analiz ediliyor...'):
+        with st.spinner('Zekamız analiz ediyor...'):
             try:
-                # Promptu aşırı basit tutuyoruz
-                prompt = f"Kullanıcı isteği: {user_input}. Bu isteğe en uygun kategoriyi seç: Yazılım, Tasarım, Araştırma, Genel. Sadece kategoriyi yaz."
+                prompt = f"Kullanıcı isteği: {user_input}. Bu isteği şu kategorilerden biriyle eşleştir: Yazılım, Tasarım, Araştırma, Genel. Sadece kategori adını yaz."
                 response = model.generate_content(prompt)
                 
                 decision = response.text.strip()
-                matched = "Genel" # Varsayılan
-                for key in AI_DIRECTORY.keys():
-                    if key.lower() in decision.lower():
-                        matched = key
-                        break
+                matched = next((k for k in AI_DIRECTORY if k.lower() in decision.lower()), "Genel")
                 
                 res = AI_DIRECTORY[matched]
                 st.balloons()
@@ -51,7 +62,7 @@ if st.button("Hangi AI Uygun?", type="primary"):
                     st.write(res['desc'])
                     st.link_button(f"{res['name']} Uygulamasına Git", res['url'], use_container_width=True)
             except Exception as e:
-                st.error(f"Teknik Hata: {e}")
+                st.error(f"Analiz sırasında bir hata oluştu: {e}")
     else:
         st.warning("Lütfen bir giriş yapın.")
 
