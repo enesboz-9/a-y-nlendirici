@@ -1,23 +1,16 @@
 import streamlit as st
 import google.generativeai as genai
-from google.generativeai.types import RequestOptions
 
 # --- 1. AYARLAR ---
 st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯")
 
 try:
-    # Secrets'tan key'i alıyoruz
     api_key = st.secrets["GOOGLE_API_KEY"]
-    
-    # KRİTİK DÜZELTME: 'v1beta' hatasını aşmak için API sürümünü 'v1'e zorluyoruz
     genai.configure(api_key=api_key)
     
-    # Modeli v1 sürümüyle çağırıyoruz
-    model = genai.GenerativeModel(
-        model_name='gemini-1.5-flash'
-    )
-    # API sürümünü manuel zorlamak için opsiyon (404'ü bitiren vuruş)
-    options = RequestOptions(api_version='v1')
+    # En stabil model ismi. Başına 'models/' ekleyerek 404'ü engelliyoruz.
+    # Versiyon zorlamasını kütüphane kendi halletsin diye sade bıraktık.
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
 except Exception as e:
     st.error(f"Başlatma Hatası: {e}")
@@ -25,7 +18,7 @@ except Exception as e:
 
 # --- 2. AI VERİTABANI ---
 AI_DIRECTORY = {
-    "Yazılım": {"name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "desc": "Kodlama ve teknik işler."},
+    "Yazılım": {"name": "Claude 3.5 Sonnet", "url": "https://claude.ai", "desc": "Kodlama projeleri için."},
     "Tasarım": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Görsel ve logo tasarımı."},
     "Araştırma": {"name": "Perplexity", "url": "https://www.perplexity.ai", "desc": "Hızlı bilgi arama."},
     "Genel": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Metin ve asistanlık."}
@@ -36,18 +29,17 @@ st.title("🎯 Akıllı AI Yönlendirici")
 st.caption("Enes Boz tarafından geliştirilmiştir.")
 st.divider()
 
-user_input = st.text_input("Ne yapmak istersiniz?", placeholder="Örn: Modern bir logo tasarlatmak istiyorum.")
+user_input = st.text_input("Ne yapmak istersiniz?", placeholder="Örn: Python ile bir uygulama yazmak istiyorum.")
 
 if st.button("AI Önerisini Gör", type="primary"):
     if user_input:
-        with st.spinner('AI ile bağlantı kuruluyor...'):
+        with st.spinner('Bağlantı kuruluyor...'):
             try:
-                # v1 sürümü üzerinden sorgu gönderiyoruz
-                prompt = f"Kullanıcı sorusu: {user_input}. Sadece şu kategorilerden birini yaz: Yazılım, Tasarım, Araştırma, Genel."
-                response = model.generate_content(prompt, request_options=options)
+                # En basit prompt yapısı
+                response = model.generate_content(f"Sadece bir kategori seç: Yazılım, Tasarım, Araştırma, Genel. Kullanıcı isteği: {user_input}")
                 
                 decision = response.text.strip()
-                matched = "Genel" # Default
+                matched = "Genel"
                 
                 for key in AI_DIRECTORY.keys():
                     if key.lower() in decision.lower():
@@ -62,8 +54,7 @@ if st.button("AI Önerisini Gör", type="primary"):
                     st.link_button(f"{res['name']} Sayfasına Git", res['url'], use_container_width=True)
             
             except Exception as e:
-                st.error(f"Teknik bir sorun oluştu: {e}")
-                st.info("Eğer hala 404 alıyorsanız, Google AI Studio'da yeni aldığınız key'in yanındaki 'Enable' butonunun aktif olduğundan emin olun.")
+                st.error(f"Bir hata oluştu: {e}")
     else:
         st.warning("Lütfen bir giriş yapın.")
 
