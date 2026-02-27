@@ -1,58 +1,94 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Streamlit Secrets üzerinden anahtarı çek (En güvenli ve doğru yol budur)
-api_key = st.secrets["GOOGLE_API_KEY"]
-
-# Arayüz Ayarları ve İmza
-st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯")
-st.title("🎯 Akıllı AI Yönlendirici")
-st.caption("Enes Boz tarafından tasarlanmıştır.")
-st.markdown("---")
-
-# API Yapılandırma
+# --- 1. AYARLAR VE GİZLİLİK ---
+# Streamlit Cloud üzerindeki 'Secrets' kısmından anahtarı çeker
 try:
+    api_key = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
-    st.error(f"API Yapılandırılamadı: {e}")
+    st.error("API Anahtarı bulunamadı veya hatalı. Lütfen Streamlit Secrets ayarlarını kontrol edin.")
+    st.stop()
 
-# Veritabanı
+# --- 2. AI VERİTABANI ---
 AI_DIRECTORY = {
-    "Yazılım ve Kodlama": {"name": "Claude 4.5", "url": "https://claude.ai", "desc": "Kod yazımı ve teknik işler."},
-    "Görsel Oluşturma": {"name": "Midjourney", "url": "https://www.midjourney.com", "desc": "Logo ve görsel tasarım."},
-    "Araştırma ve Bilgi": {"name": "Perplexity", "url": "https://www.perplexity.ai", "desc": "Hızlı ve kaynaklı bilgi."},
-    "Video Üretimi": {"name": "Sora / Veo", "url": "https://openai.com/sora", "desc": "Yapay zeka videoları."},
-    "Metin ve Yazarlık": {"name": "ChatGPT", "url": "https://chatgpt.com", "desc": "Genel metin işleri."}
+    "Yazılım ve Kodlama": {
+        "name": "Claude 3.5 Sonnet", 
+        "url": "https://claude.ai", 
+        "desc": "Karmaşık yazılım projeleri ve mantık yürütme için en iyisi."
+    },
+    "Görsel Tasarım": {
+        "name": "Midjourney", 
+        "url": "https://www.midjourney.com", 
+        "desc": "Logo, UI/UX tasarımı ve sanatsal görseller için rakipsiz."
+    },
+    "Araştırma ve Bilgi": {
+        "name": "Perplexity AI", 
+        "url": "https://www.perplexity.ai", 
+        "desc": "İnterneti tarayarak kaynak gösteren en hızlı arama motoru."
+    },
+    "Video Üretimi": {
+        "name": "Luma Dream Machine", 
+        "url": "https://lumalabs.ai/dream-machine", 
+        "desc": "Yüksek kaliteli ve gerçekçi AI videoları oluşturur."
+    },
+    "Metin ve Yazarlık": {
+        "name": "ChatGPT", 
+        "url": "https://chatgpt.com", 
+        "desc": "Blog yazıları, özetleme ve günlük asistanlık işlerinde lider."
+    }
 }
 
-query = st.text_input("Ne yapmak istiyorsunuz?", placeholder="Örn: Bir logo tasarlatmak istiyorum.")
+# --- 3. ARAYÜZ TASARIMI ---
+st.set_page_config(page_title="AI Router | Enes Boz", page_icon="🎯", layout="centered")
 
-if st.button("En Uygun AI'ı Göster"):
-    if query:
-        with st.spinner('Analiz ediliyor...'):
+# Başlık ve İmza
+st.title("🎯 Akıllı AI Yönlendirici")
+st.markdown(f"<p style='color: grey;'>Enes Boz tarafından tasarlanmıştır.</p>", unsafe_allow_html=True)
+st.divider()
+
+# Kullanıcı Girişi
+user_query = st.text_input("Bugün ne yapmak istiyorsun?", placeholder="Örn: Modern bir logo tasarlatmak istiyorum.")
+
+if st.button("En Uygun AI'ı Göster", type="primary"):
+    if user_query:
+        with st.spinner('Zekamız iş başında, analiz ediliyor...'):
             try:
-                prompt = f"Kullanıcı isteği: '{query}'. Bunu sadece şu kategorilerden biriyle eşleştir: {list(AI_DIRECTORY.keys())}. Sadece kategori adını yaz."
+                # Yapay Zekaya Danışma
+                prompt = f"""
+                Kullanıcı İsteği: "{user_query}"
+                Bu isteği şu kategorilerden sadece birine ata: {list(AI_DIRECTORY.keys())}.
+                Sadece kategori ismini yaz, açıklama yapma.
+                """
                 response = model.generate_content(prompt)
-                category_result = response.text.strip()
+                ai_decision = response.text.strip()
                 
-                matched_category = None
+                # Karar Kontrolü
+                matched_cat = None
                 for cat in AI_DIRECTORY.keys():
-                    if cat.lower() in category_result.lower():
-                        matched_category = cat
+                    if cat.lower() in ai_decision.lower():
+                        matched_cat = cat
                         break
                 
-                if matched_category:
-                    res = AI_DIRECTORY[matched_category]
+                if matched_cat:
+                    res = AI_DIRECTORY[matched_cat]
                     st.balloons()
-                    st.success(f"Önerilen Araç: **{res['name']}**")
-                    st.info(res['desc'])
-                    st.link_button(f"{res['name']} Sayfasına Git 🚀", res['url'], use_container_width=True)
+                    st.success(f"Analiz Tamamlandı! Senin için en iyisi: **{res['name']}**")
+                    
+                    # Sonuç Kartı
+                    with st.container(border=True):
+                        st.subheader(res['name'])
+                        st.write(res['desc'])
+                        st.link_button(f"{res['name']} Sayfasına Git 🚀", res['url'], use_container_width=True)
                 else:
-                    st.warning("Eşleşme sağlanamadı, lütfen başka bir cümle deneyin.")
+                    st.warning("İsteğine uygun bir AI aracı kategorize edilemedi. Lütfen daha detaylı yaz.")
+            
             except Exception as e:
-                st.error("Bir hata oluştu. Lütfen Secrets kısmındaki API anahtarını kontrol edin.")
+                st.error(f"Bir teknik hata oluştu: {e}")
     else:
-        st.warning("Lütfen bir giriş yapın.")
+        st.warning("Lütfen bir iş veya görev giriniz.")
 
-st.markdown("<br><br><center style='opacity: 0.5;'>© 2026 | Enes Boz</center>", unsafe_allow_html=True)
+# Alt Bilgi
+st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+st.markdown("<center style='opacity: 0.4;'>© 2026 | Enes Boz tarafından geliştirildi.</center>", unsafe_allow_html=True)
