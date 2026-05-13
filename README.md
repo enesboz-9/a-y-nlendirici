@@ -7,9 +7,3 @@ Bu uygulama, kullanıcının yapmak istediği işi analiz ederek onu en uygun Ya
 - **Streamlit** tabanlı kullanıcı dostu arayüz.
 - Tamamen ücretsiz altyapı.
 
-## 🛠️ Kurulum
-
-1. Bu depoyu klonlayın:
-   ```bash
-   git clone [https://github.com/kullanici-adin/proje-adin.git](https://github.com/kullanici-adin/proje-adin.git)
-
